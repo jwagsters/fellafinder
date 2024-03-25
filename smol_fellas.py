@@ -92,9 +92,8 @@ def session(fella_dict):
 
 	# Things we can do in a session
 	actions = [
-		visit_fella,
 		scrape_fella,
-		scrape_fella
+		visit_fella
 	]
 
 	# We'll do various things this session
@@ -245,26 +244,36 @@ def visit_fella(fella_dict, fella = None):
 		driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", tweet)
 		time.sleep(1)
 
-		if random.random() > 0.5 and like_btn:
-			print("Like")
-			like_btn.click()
-			time.sleep(1)
+		if random.random() > 0.3 and like_btn:
+			try:
+				print("Like tweet: ", end="")
+				like_btn.click()
+				time.sleep(1)
+				print("success")
+			except:
+				print("failed")
 
-		if random.random() > 0.5 and rt_btn:
-			print("Retweet")
-			rt_btn.click()
-			time.sleep(1)
-			driver.find_element(By.CSS_SELECTOR, "div[data-testid='Dropdown'] div[data-testid='retweetConfirm']").click()
-			sleep_rand(3)
+		if random.random() > 0.3 and rt_btn:
+			try:
+				print("Retweet: ", end="")
+				rt_btn.click()
+				time.sleep(1)
+				driver.find_element(By.CSS_SELECTOR, "div[data-testid='Dropdown'] div[data-testid='retweetConfirm']").click()
+				sleep_rand(3)
+				print("success")
+			except:
+				print("failed")
 
 	return 0
 
 def check_fella(fella, smol_fella_dict):
-	print("Check @" + fella)
+	lc = (datetime.datetime.now() - smol_fella_dict[fella]["checked"]).days
+	print(f"Last checked: {lc} days ago")
 	body_text = driver.find_element(By.CSS_SELECTOR, "body").text
 	tweets = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']")
 	if "Account suspended" in body_text or "This account doesn’t exist" in body_text or len(tweets) == 0:
 		smol_fella_dict[fella]['ignore'] = True 
+		print("Account not available")
 	else:
 		followers_link = get_link_containing("/verified_followers")
 		follower_count = int(followers_link.find_element(By.CSS_SELECTOR, "span:first-child > span").text.replace("K", "000").replace(".", "").replace(",", ""))
@@ -272,8 +281,11 @@ def check_fella(fella, smol_fella_dict):
 		following_link = get_link_containing("/following")
 		following_count = int(following_link.find_element(By.CSS_SELECTOR, "span:first-child > span").text.replace("K", "000").replace(".", "").replace(",", ""))
 
+		print("Followers then: " + str(smol_fella_dict[fella]["follower_count"]) + " | Followers now: " + str(follower_count))
+
 		smol_fella_dict[fella]["following_count"] = following_count
 		smol_fella_dict[fella]["follower_count"] = follower_count
+		
 
 	smol_fella_dict[fella]["checked"] = datetime.datetime.now()
 
@@ -485,6 +497,7 @@ def block_patterns():
 
 def block_list():
 	return [
+		"markusdresch",
 		"SarahAshtonL",
 		"TimDobson841518",
 		"666GeorgeSoros",
