@@ -515,16 +515,18 @@ def print_stats(fella_dict):
 	big_count = 0
 	scraped_count = 0
 	ignore_count = 0
-	for fella in fella_dict:
-		if fella_dict[fella]['ignore']:
-			ignore_count += 1
-			continue
-		if (datetime.datetime.now() - fella_dict[fella]['scraped']).days < 365:
-			scraped_count += 1
-		if fella_dict[fella]['follower_count'] < smol_limit:
-			smol_count += 1
-		if fella_dict[fella]['follower_count'] >= smol_limit:
-			big_count += 1
+	with open("smolfellas.txt", "w") as file:
+		for fella in fella_dict:
+			if fella_dict[fella]['ignore']:
+				ignore_count += 1
+				continue
+			if (datetime.datetime.now() - fella_dict[fella]['scraped']).days < 365:
+				scraped_count += 1
+			if fella_dict[fella]['follower_count'] < smol_limit:
+				smol_count += 1
+				file.write("@" + fella + " - " + str(fella_dict[fella]['follower_count']) + "\n")
+			if fella_dict[fella]['follower_count'] >= smol_limit:
+				big_count += 1
 	print()
 	print("Fellas:      " + str(len(fella_dict)))
 	print("Big fellas:  " + str(big_count))
