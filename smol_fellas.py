@@ -28,12 +28,14 @@ print = functools.partial(print, flush=True)
 USER_NAME = ""
 PASSWORD = ""
 
+fella_dict = {}
 smol_limit = 500		# Fellas with more than this amount of followers are not considered smol 
+session_count = 0
 
 
 
 def main():
-	global USER_NAME, PASSWORD
+	global USER_NAME, PASSWORD, fella_dict
 
 	fella_dict = loadFellas()
 	
@@ -53,39 +55,37 @@ def main():
 	
 	login(USER_NAME, PASSWORD)
 
-	print_stats(fella_dict)
+	print_stats()
 
-	run(fella_dict)
+	run()
 
 
 
-def run(fella_dict):
+def run():
+
+	global session_count
 	
 	while True:
 
 		# Run a session
-		print("\n\nSESSION")
-		session(fella_dict)
-		print_stats(fella_dict)
+		session_count += 1
+		print("\n\nSESSION " + str(session_count))
+		session()
+		print_stats()
 		driver_get("https://twitter.com/" + USER_NAME)
 
-
-		if datetime.datetime.now().hour > 6:
-			if random.random() < 0.3 or datetime.datetime.now().isoweekday() == 5:
-				post_message(output_string(fella_dict))
-			sleep_rand(60*45, True)
-		else:	
-			post_message(output_string(fella_dict))
-			post_message(sign_off(fella_dict))
-			print("It's time for bed.")
-			time.sleep(60*60*7)
-	
+		if random.random() < 0.3 or datetime.datetime.now().isoweekday() == 5:
+			post_message(output_string())
+			follow_back()
+		sleep_rand(60*30, True)
 
 
-def session(fella_dict):
+def session():
 
 	fellas_by_checked = sorted(fella_dict, key = lambda item: fella_dict[item]['checked'])
 	fellas_by_scraped = sorted(fella_dict, key = lambda item: fella_dict[item]['scraped'])
+
+	time.sleep(30)
 
 	check_list = []
 	for fella in fellas_by_checked:
@@ -101,16 +101,16 @@ def session(fella_dict):
 	for i in range(1, random.randint(15,30)):
 		print("\n" + str(i) + ": ", end="")
 		if i%2 == 0:
-			visit_fella(fella_dict, check_list.pop(0))
+			visit_fella(check_list.pop(0))
 		else:
-			scrape_fella(fella_dict, scrape_list.pop(0))
+			scrape_fella(scrape_list.pop(0))
 
-		saveFellas(fella_dict)
+		saveFellas()
 		sleep_rand(60)
 
 
 
-def scrape_fella(fella_dict, fella):
+def scrape_fella(fella):
 	print("Scraping @" + fella)
 
 	ls = (datetime.datetime.now() - fella_dict[fella]["scraped"]).days
@@ -120,14 +120,21 @@ def scrape_fella(fella_dict, fella):
 		print(f"Last scraped: {ls} days ago")
 
 	body_text = driver_get("https://twitter.com/" + fella)
-	insertStyle()
 
 	if "These posts are protected" in body_text or "Account suspended" in body_text or "This account doesn’t exist" in body_text:
 		fella_dict[fella]['ignore'] = True 
 		print("Account unavailable. Added to ignore list.")
 		return
 
+	try:
+		driver.find_element(By.CSS_SELECTOR, "div[aria-label='Follow @" + fella + "']").click()
+		print("Followed @" + fella)
+		sleep_rand(3)
+	except:
+		pass
+
 	body_text = driver_get("https://twitter.com/" + fella + "/followers")
+	insertStyle()
 
 
 	index = 0
@@ -150,7 +157,7 @@ def scrape_fella(fella_dict, fella):
 
 			index += 1
 			if index % 200 == 0:
-				saveFellas(fella_dict)
+				saveFellas()
 
 			link = follower.find_element(By.CSS_SELECTOR, "a")
 			user = link.get_attribute('href').replace("https://twitter.com/", "")
@@ -160,7 +167,8 @@ def scrape_fella(fella_dict, fella):
 
 			try:
 				driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", follower)
-				time.sleep(0.5)			
+				time.sleep(0.5)
+				sleep_rand(0.5)			
 				if user in fella_dict and (datetime.datetime.now() - fella_dict[user]['checked']).days < 7:
 					driver.execute_script("arguments[0].setAttribute('scraped', 'true')", follower)
 					if fella_dict[user]['follower_count'] < smol_limit:
@@ -175,7 +183,7 @@ def scrape_fella(fella_dict, fella):
 				txt = follower.text.lower()
 
 
-				if ("nafo" in txt or "fella" in txt or "fellina" in txt or "bonk" in txt) and (user not in block_list()):
+				if ("nafo " in txt or "fella" in txt or "fellina" in txt or "bonk" in txt) and (user not in block_list()):
 
 					# It's just a jump to the left...
 					ActionChains(driver).move_to_element(link).perform()
@@ -201,18 +209,7 @@ def scrape_fella(fella_dict, fella):
 						driver.execute_script("arguments[0].setAttribute('fellatype', 'large')", follower)
 
 					if user not in fella_dict:
-						fella_dict[user] = {
-							"username": user,
-							"following_count": following_count,
-							"follower_count": follower_count,
-							"found": datetime.datetime.now(),
-							"checked": datetime.datetime.now(),
-							"vetted": False,
-							"scraped": datetime.datetime.fromtimestamp(0),
-							"tweeted": datetime.datetime.fromtimestamp(0),
-							"last_active": datetime.datetime.now(),
-							"ignore": False
-						}
+						fella_dict[user] = get_new_fella(user, following_count, follower_count)
 					else:
 						fella_dict[user]["following_count"] = following_count
 						fella_dict[user]["follower_count"] = follower_count
@@ -235,7 +232,7 @@ def scrape_fella(fella_dict, fella):
 
 
 
-def visit_fella(fella_dict, fella):
+def visit_fella(fella):
 
 	print("Visiting @" + fella)
 
@@ -252,6 +249,7 @@ def visit_fella(fella_dict, fella):
 		print("Account unavailable. Added to ignore list.")
 		return
 
+
 	driver_get("https://twitter.com/" + fella + "/with_replies")
 	time.sleep(3)
 	last_reply = most_recent()
@@ -263,24 +261,23 @@ def visit_fella(fella_dict, fella):
 	la = (datetime.datetime.now() - fella_dict[fella]["last_active"]).days
 	print(f"Last active: {la} days ago")
 
-	check_fella(fella, fella_dict)
-
 	if la > 60:
 		fella_dict[fella]['ignore'] = True
 		print("Added to ignore list")
+		return
 
 	if la < 7:
 		boost_fella(fella)
+
+	check_fella(fella)
 	
 	time.sleep(3)
 
 
 
-
-def check_fella(fella, fella_dict):
+def check_fella(fella):
 	body_text = driver.find_element(By.CSS_SELECTOR, "body").text
-	tweets = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']")
-	
+		
 	followers_link = driver.find_element(By.CSS_SELECTOR, "a[href='/" + fella + "/verified_followers']")
 	follower_count = int(followers_link.find_element(By.CSS_SELECTOR, "span:first-child > span").text.replace("K", "000").replace(".", "").replace(",", ""))
 	following_link = driver.find_element(By.CSS_SELECTOR, "a[href='/" + fella + "/following']")
@@ -295,11 +292,41 @@ def check_fella(fella, fella_dict):
 def update_fella(fella, follower_count, following_count, log = False):
 	if log:
 		print("Followers then: " + str(fella["follower_count"]) + " | Followers now: " + str(follower_count))
-	if fella['follower_count'] < 500 and follower_count >= 500:
-		exclamations = ["WHOOP!!!", "HUZZAH!!!", "HOORAY!!!", "YAY!!!", "YIPPEE!!", "WORD UP!"]
-		message =  random.choice(exclamations) + " @" + fella['username'] + " now has " + str(follower_count) + " followers and is no longer a smol fella! "
-		message += "Thanks fellas for your support and please look after them. \n\n@" + fella['username'] + " please remember to check your followers list and follow everyone back."
-		post_message(message)
+	if fella['follower_count'] < 500: 
+		if follower_count >= 500:
+			exclamations = ["WHOOP!!!", "HUZZAH!!!", "HOORAY!!!", "YAY!!!", "YIPPEE!!", "WORD UP!"]
+			message =  random.choice(exclamations) + " @" + fella['username'] + " now has " + str(follower_count) + " followers and is no longer a smol fella! "
+			message += "Thanks fellas for your support and please look after them. \n\n@" + fella['username'] + " please remember to check your followers list and follow everyone back."
+			post_message(message)
+		else:
+			try:
+				driver.find_element(By.CSS_SELECTOR, 'div[data-testid="userFollowIndicator"]')
+			except:
+				days_unreciprocated = (datetime.datetime.now() - fella['found']).days
+				print("Not following back after " + str(days_unreciprocated) + " days")
+
+
+				if days_unreciprocated > 30:
+					
+					fella['ignore'] = True
+					print("Ignored.")
+					try:
+						time.sleep(2)
+						driver.find_element(By.CSS_SELECTOR, 'div[aria-label="Following @' + fella['username'] + '"]').click()
+						time.sleep(2)
+						driver.find_element(By.CSS_SELECTOR, 'div[data-testid="confirmationSheetConfirm"]').click()
+						time.sleep(2)
+						print("Unfollowed.")
+					except:
+						print("Failed to unfollow.")
+						pass
+				
+				elif days_unreciprocated > 14:
+					message = "@" + fella['username'] + " - following back is kind and good. Don't forget to check your followers list and follow them back.\n\n"
+					message += "https://twitter.com/" + fella['username'] + "/followers \n\nThanks!" 
+					post_message(message)
+
+	 
 	fella["following_count"] = following_count
 	fella["follower_count"] = follower_count
 
@@ -407,7 +434,7 @@ def login(username, password):
 
 
 
-def output_string(fella_dict):
+def output_string():
 
 	tweet_list = []
 
@@ -415,7 +442,7 @@ def output_string(fella_dict):
 	for fella in fellas_by_checked:
 		f = fella_dict[fella]
 		now = datetime.datetime.now()
-		if (now - f['last_active']).days < 14 and not f['ignore'] and f['follower_count'] < smol_limit:
+		if f['last_active'] != None and (now - f['last_active']).days < 14 and not f['ignore'] and f['follower_count'] < smol_limit:
 			tweet_list.append(fella)
 
 	str1 = ["Check out these lil fellas", "More smol fellas here", "Here are some little fellas", "These are smol fellas", "Here's some lesser-known fellas"]
@@ -439,13 +466,13 @@ def output_string(fella_dict):
 		else: 
 			break
 	ostr += s4 + s5
-	saveFellas(fella_dict)
+	saveFellas()
 	return ostr
 
 
 
-def sign_off(fella_dict):
-	smol_fella_count = len(get_smol_fellas(fella_dict))
+def sign_off():
+	smol_fella_count = len(get_smol_fellas())
 	message = "Good night all.\n\n"
 	message += "I am currently tracking " + str(smol_fella_count) + " smol fellas. "
 	message += "Let's make them all into big fellas!\n\n"
@@ -456,19 +483,22 @@ def sign_off(fella_dict):
 
 def loadFellas():
 
+	global fella_dict
+
 	if os.path.exists("fellas.pkl"):
 		with open('fellas.pkl', 'rb') as f:
 			fella_dict = pickle.load(f)
-			clean_list(fella_dict)
+			clean_list()
+			validate_fellas()
+			return fella_dict
 	else:
-		fella_dict = {}
-	validate_fellas(fella_dict)
-	return fella_dict
+		print("fellas.pkl not found!")
+		quit()
 
 
 
-def saveFellas(fella_dict):
-	clean_list(fella_dict)
+def saveFellas():
+	clean_list()
 	with open('fellas.pkl', 'wb') as f:
 		pickle.dump(fella_dict, f)
 	with open('fellas.pkl.bak', 'wb') as f:
@@ -477,13 +507,14 @@ def saveFellas(fella_dict):
 
 
 
-def validate_fellas(fella_dict):
-
+def validate_fellas():
 
 	for fella in fella_dict:
 
 		if not "last_active" in fella_dict[fella]: 
 			fella_dict[fella]["last_active"] = datetime.datetime.now()
+		if fella_dict[fella]["checked"] == None:
+			fella_dict[fella]["checked"] = datetime.datetime.fromtimestamp(0)
 
 
 		if fella in block_list():
@@ -492,7 +523,10 @@ def validate_fellas(fella_dict):
 			if term in fella:
 				fella_dict[fella]["ignore"] = True
 
-	fella_dict["Bliblabloeblob"]['ignore'] = True
+	for fella in add_list():
+		if fella not in fella_dict:
+			fella_dict[fella] = get_new_fella(fella)
+			print("Added", fella)
 
 	print ("\n\nValidated fella data")
 
@@ -502,15 +536,17 @@ def insertStyle():
 
 	styleScript = """
 	let styleEl = document.createElement("style")
+	styleEl.type = 'text/css'
 	styleEl.innerHTML = "div[data-testid='cellInnerDiv']{border-left: solid 5px white} div[scraped='true']{border-left: solid 5px #bbb} div[scraped='true'][fellatype='smol']{border-left: solid 5px #ffd700} div[scraped='true'][fellatype='large']{border-left: solid 5px #0057b8}"
-	document.body.prepend(styleEl)
+	console.dir(styleEl)
+	document.head.appendChild(styleEl)
 	"""
 
 	driver.execute_script(styleScript)
 
 
 
-def print_stats(fella_dict):
+def print_stats():
 	smol_count = 0
 	big_count = 0
 	scraped_count = 0
@@ -536,7 +572,7 @@ def print_stats(fella_dict):
 
 
 
-def clean_list(fella_dict):
+def clean_list():
 
 	for b in block_list():
 		if b in fella_dict:
@@ -547,24 +583,38 @@ def clean_list(fella_dict):
 			if b.lower() in f.lower():
 				fella_dict[f]['ignore'] = True
 
-	return fella_dict
-
 
 
 def driver_get(url):
 
+	global session_count, driver
+
+	if datetime.datetime.now().hour < 6:
+		post_message(sign_off())
+		print("It's time for bed.")
+		time.sleep(60*60*7)
+		follow_back()
+		session_count = 0
+
 	driver.get(url)
 	time.sleep(3)
 	body_text = driver.find_element(By.CSS_SELECTOR, "body").text
+
 
 	if "Your account has been locked" in body_text:
 		print("They're on to us!  Time for an Arkose.  Press Enter when account unlocked.")
 		input()
 
 
-	if "Something went wrong. Try reloading" in body_text:
+	if "Something went wrong. Try reloading" in body_text or body_text == "":
 		print("Rate limited.  Need to wait a bit.")
-		sleep_rand(60*60, True)
+		current_url = driver.current_url
+		driver.close()
+		sleep_rand(2*60*60, True)
+		driver = webdriver.Chrome(options=options)
+		driver_get(current_url)
+		time.sleep(3)
+
 
 	try:
 		driver.find_element(By.CSS_SELECTOR, "div[data-testid='BottomBar'] div[role='button']:first-child").click()	
@@ -576,7 +626,57 @@ def driver_get(url):
 
 
 
-def get_smol_fellas(fella_dict):
+def follow_back():
+	driver_get("https://twitter.com/" + USER_NAME + "/followers")
+	time.sleep(3)
+	done_list = []
+	follow_limit = 25
+	follow_count = 0
+	follower_count = 0
+	follower_limit = 200
+	while True:
+		followers = driver.find_elements(By.CSS_SELECTOR, "div[data-testid='cellInnerDiv']")
+		for follower in followers:
+			try:
+				if follower.text == "":
+					print("Checked " + str(follower_count) + " followers and followed " + str(follow_count) + " back")
+					return
+				link = follower.find_element(By.CSS_SELECTOR, "a")
+				user = link.get_attribute('href').replace("https://twitter.com/", "")
+			except:
+				continue
+			if user not in done_list:
+				follower_count += 1
+				driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", follower)
+				sleep_rand(0.3)
+				try:
+					follower.find_element(By.CSS_SELECTOR, 'div[aria-label="Follow @' + user + '"]').click()
+					follow_count += 1
+					sleep_rand(5)
+				except Exception as e:
+					pass
+				done_list.append(user)
+				if follow_count >= follow_limit or follower_count >= follower_limit:
+					print("Checked " + str(follower_count) + " followers and followed " + str(follow_count) + " back")
+					return
+	
+def get_new_fella(username, following_count = 0, follower_count = 0):
+	return {
+				"username": username,
+				"following_count": following_count,
+				"follower_count": follower_count,
+				"found": datetime.datetime.now(),
+				"checked": datetime.datetime.fromtimestamp(0),
+				"vetted": False,
+				"scraped": datetime.datetime.fromtimestamp(0),
+				"tweeted": datetime.datetime.fromtimestamp(0),
+				"last_active": None,
+				"ignore": False
+			}
+
+
+
+def get_smol_fellas():
 	smol_fella_dict = {}
 	for fella in fella_dict:
 		if fella_dict[fella]['follower_count'] < smol_limit:
@@ -591,6 +691,22 @@ def get_link_containing(url_fragment):
 			return el
 
 
+def add_list():
+	return[
+		"KombatMedicLivs",
+		"revengehugh", 
+		"warrior_na92602", 
+		"fellaforlife", 
+		"BorgFellaQueen",
+		"WillowMantis",
+		"Jpod_art",
+		"not_honeybee", 
+		"elisabethinwa", 
+		"the_harald22976"
+	]
+
+
+
 def block_patterns():
 	return [
 		"TimDobson",
@@ -601,6 +717,9 @@ def block_patterns():
 
 def block_list():
 	return [	
+		"AlphariusFella",
+		"LuborKonicek",
+		"darthrevan1609",
 		"ComeCryHereNazi",
 		"Regiscarbone",
 		"RusselltheAFU",
