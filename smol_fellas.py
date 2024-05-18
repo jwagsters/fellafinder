@@ -72,7 +72,7 @@ def run():
 		print("\n\nSESSION " + str(session_count))
 		session()
 		print_stats()
-		driver_get("https://twitter.com/" + USER_NAME)
+		driver_get("https://x.com/" + USER_NAME)
 
 		if random.random() < 0.3 or datetime.datetime.now().isoweekday() == 5:
 			post_message(output_string())
@@ -81,6 +81,7 @@ def run():
 
 
 def session():
+
 
 	fellas_by_checked = sorted(fella_dict, key = lambda item: fella_dict[item]['checked'])
 	fellas_by_scraped = sorted(fella_dict, key = lambda item: fella_dict[item]['scraped'])
@@ -111,6 +112,7 @@ def session():
 
 
 def scrape_fella(fella):
+	print(fella)
 	print("Scraping @" + fella)
 
 	ls = (datetime.datetime.now() - fella_dict[fella]["scraped"]).days
@@ -119,7 +121,7 @@ def scrape_fella(fella):
 	else:
 		print(f"Last scraped: {ls} days ago")
 
-	body_text = driver_get("https://twitter.com/" + fella)
+	body_text = driver_get("https://x.com/" + fella)
 
 	if "These posts are protected" in body_text or "Account suspended" in body_text or "This account doesn’t exist" in body_text:
 		fella_dict[fella]['ignore'] = True 
@@ -133,7 +135,7 @@ def scrape_fella(fella):
 	except:
 		pass
 
-	body_text = driver_get("https://twitter.com/" + fella + "/followers")
+	body_text = driver_get("https://x.com/" + fella + "/followers")
 	insertStyle()
 
 
@@ -160,7 +162,7 @@ def scrape_fella(fella):
 				saveFellas()
 
 			link = follower.find_element(By.CSS_SELECTOR, "a")
-			user = link.get_attribute('href').replace("https://twitter.com/", "")
+			user = link.get_attribute('href').replace("https://x.com/", "")
 			if user in done_list:
 				continue
 
@@ -239,7 +241,7 @@ def visit_fella(fella):
 	lc = (datetime.datetime.now() - fella_dict[fella]["checked"]).days
 	print(f"Last checked: {lc} days ago")
 
-	body_text = driver_get("https://twitter.com/" + fella)
+	body_text = driver_get("https://x.com/" + fella)
 	time.sleep(3)
 
 	tweets = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']")
@@ -250,10 +252,10 @@ def visit_fella(fella):
 		return
 
 
-	driver_get("https://twitter.com/" + fella + "/with_replies")
+	driver_get("https://x.com/" + fella + "/with_replies")
 	time.sleep(3)
 	last_reply = most_recent()
-	driver_get("https://twitter.com/" + fella)
+	driver_get("https://x.com/" + fella)
 	last_tweet = most_recent()
 	fella_dict[fella]["last_active"] = last_tweet if last_tweet > last_reply else last_reply
 
@@ -323,7 +325,7 @@ def update_fella(fella, follower_count, following_count, log = False):
 				
 				elif days_unreciprocated > 14:
 					message = "@" + fella['username'] + " - following back is kind and good. Don't forget to check your followers list and follow them back.\n\n"
-					message += "https://twitter.com/" + fella['username'] + "/followers \n\nThanks!" 
+					message += "https://x.com/" + fella['username'] + "/followers \n\nThanks!" 
 					post_message(message)
 
 	 
@@ -381,13 +383,13 @@ def boost_fella(fella):
 
 def post_message(content):
 	time.sleep(3)
-	driver.find_element(By.CSS_SELECTOR, "a[aria-label='Post']").click()
+	get_link_containing("/compose/post").click()
 	time.sleep(2)
 	input_field = driver.find_element(By.CSS_SELECTOR, "div[aria-modal='true'] [data-text='true']")
 	input_field.send_keys(Keys.CONTROL + "a")
 	input_field.send_keys(content)
 	time.sleep(20)
-	tweet_btn = driver.find_element(By.CSS_SELECTOR, "div[aria-modal='true'] div[data-testid='tweetButton']")
+	tweet_btn = get_button_by_text("Post")
 	driver.execute_script("arguments[0].click()", tweet_btn)
 	print("\n\n--- Tweet Sent at " + datetime.datetime.now().strftime("%H:%M") + " ---\n")
 	print(content)
@@ -421,15 +423,15 @@ def sleep_rand(t, log=False):
 
 def login(username, password):
 	sleep_rand(1)
-	driver_get("https://twitter.com/i/flow/login")
+	driver_get("https://x.com/i/flow/login")
 	sleep_rand(8)
 	driver.find_element(By.CSS_SELECTOR, "input").send_keys(username)
 	sleep_rand(2)
-	driver.find_element(By.CSS_SELECTOR, "div[data-viewportview='true'] > div > div > div:nth-child(6)").click()
+	get_button_by_text("Next").click()
 	time.sleep(8)
 	driver.find_element(By.CSS_SELECTOR, "input[name='password']").send_keys(password)
 	sleep_rand(2)
-	driver.find_element(By.CSS_SELECTOR, "div[data-testid='LoginForm_Login_Button']").click()
+	get_button_by_text("Log in").click()
 	time.sleep(5)
 
 
@@ -528,6 +530,8 @@ def validate_fellas():
 			fella_dict[fella] = get_new_fella(fella)
 			print("Added", fella)
 
+
+
 	print ("\n\nValidated fella data")
 
 
@@ -537,7 +541,7 @@ def insertStyle():
 	styleScript = """
 	let styleEl = document.createElement("style")
 	styleEl.type = 'text/css'
-	styleEl.innerHTML = "div[data-testid='cellInnerDiv']{border-left: solid 5px white} div[scraped='true']{border-left: solid 5px #bbb} div[scraped='true'][fellatype='smol']{border-left: solid 5px #ffd700} div[scraped='true'][fellatype='large']{border-left: solid 5px #0057b8}"
+	styleEl.innerHTML = "div[data-testid='cellInnerDiv']{border-left: solid 5px #333} div[scraped='true']{border-left: solid 5px #bbb} div[scraped='true'][fellatype='smol']{border-left: solid 5px #ffd700} div[scraped='true'][fellatype='large']{border-left: solid 5px #0057b8}"
 	console.dir(styleEl)
 	document.head.appendChild(styleEl)
 	"""
@@ -561,7 +565,7 @@ def print_stats():
 			if fella_dict[fella]['follower_count'] < smol_limit:
 				smol_count += 1
 				file.write("@" + fella + " - " + str(fella_dict[fella]['follower_count']) + "\n")
-			if fella_dict[fella]['follower_count'] >= smol_limit:
+			else:
 				big_count += 1
 	print()
 	print("Fellas:      " + str(len(fella_dict)))
@@ -587,16 +591,32 @@ def clean_list():
 
 def driver_get(url):
 
-	global session_count, driver
+	global session_count, driver, USER_NAME, PASSWORD
 
 	if datetime.datetime.now().hour < 6:
 		post_message(sign_off())
 		print("It's time for bed.")
+		prune_following()
 		time.sleep(60*60*7)
 		follow_back()
 		session_count = 0
 
-	driver.get(url)
+	try:
+		driver.get(url)
+	except:
+		print("Problem loading page " + url)
+		try:
+			print("Restarting browser.")
+			driver.close()
+			driver = webdriver.Chrome(options=options)
+			login()
+			driver.get(url)
+		except Exception as e:
+			print("Failed to restart browser")
+			print(e)
+			quit()
+
+
 	time.sleep(3)
 	body_text = driver.find_element(By.CSS_SELECTOR, "body").text
 
@@ -617,7 +637,7 @@ def driver_get(url):
 
 
 	try:
-		driver.find_element(By.CSS_SELECTOR, "div[data-testid='BottomBar'] div[role='button']:first-child").click()	
+		get_button_by_text("Accept all cookies").click()	
 		sleep_rand(5)
 	except:
 		pass
@@ -627,7 +647,7 @@ def driver_get(url):
 
 
 def follow_back():
-	driver_get("https://twitter.com/" + USER_NAME + "/followers")
+	driver_get("https://x.com/" + USER_NAME + "/followers")
 	time.sleep(3)
 	done_list = []
 	follow_limit = 25
@@ -642,7 +662,7 @@ def follow_back():
 					print("Checked " + str(follower_count) + " followers and followed " + str(follow_count) + " back")
 					return
 				link = follower.find_element(By.CSS_SELECTOR, "a")
-				user = link.get_attribute('href').replace("https://twitter.com/", "")
+				user = link.get_attribute('href').replace("https://x.com/", "")
 			except:
 				continue
 			if user not in done_list:
@@ -658,6 +678,48 @@ def follow_back():
 				done_list.append(user)
 				if follow_count >= follow_limit or follower_count >= follower_limit:
 					print("Checked " + str(follower_count) + " followers and followed " + str(follow_count) + " back")
+					return
+
+def prune_following():
+	print("Pruning follow list")
+	driver_get("https://x.com/" + USER_NAME + "/following")
+	time.sleep(3)
+	done_list = []
+	unfollow_limit = 50
+	list_item_count = 0
+	unfollow_count = 0
+	start_unfollowing_at = 500
+	while True:
+		user_els = driver.find_elements(By.CSS_SELECTOR, "div[data-testid='cellInnerDiv']")
+		for user_el in user_els:
+			try:
+				if user_el.text == "":
+					print("Checked " + str(list_item_count) + " followers and unfollowed " + str(unfollow_count))
+					return
+				link = user_el.find_element(By.CSS_SELECTOR, "a")
+				user = link.get_attribute('href').replace("https://x.com/", "")
+			except Exception as e:
+				continue
+			if user not in done_list:
+				list_item_count += 1
+				driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", user_el)
+				sleep_rand(0.2)
+				if not "Follows you" in user_el.text and list_item_count > start_unfollowing_at:
+					try:
+						user_el.find_element(By.CSS_SELECTOR, 'div[aria-label="Following @' + user + '"]').click()
+						time.sleep(1)
+						driver.find_element(By.CSS_SELECTOR, 'div[data-testid="confirmationSheetConfirm"]').click()
+						unfollow_count += 1
+						print("x", end="")
+						sleep_rand(5)
+					except Exception as e:
+						print("-", end="")
+						pass
+				else:
+					print(".", end="")
+				done_list.append(user)
+				if unfollow_count >= unfollow_limit:
+					print("Checked " + str(list_item_count) + " followers and unfollowed " + str(unfollow_count))
 					return
 	
 def get_new_fella(username, following_count = 0, follower_count = 0):
@@ -679,7 +741,7 @@ def get_new_fella(username, following_count = 0, follower_count = 0):
 def get_smol_fellas():
 	smol_fella_dict = {}
 	for fella in fella_dict:
-		if fella_dict[fella]['follower_count'] < smol_limit:
+		if fella_dict[fella]['follower_count'] < smol_limit and not fella_dict[fella]['ignore']:
 			smol_fella_dict[fella] = fella_dict[fella]
 	return smol_fella_dict
 
@@ -691,18 +753,17 @@ def get_link_containing(url_fragment):
 			return el
 
 
+
+def get_button_by_text(text):
+	for el in driver.find_elements(By.CSS_SELECTOR, "button"):
+		if text == el.text:
+			return el
+
+
 def add_list():
 	return[
-		"KombatMedicLivs",
-		"revengehugh", 
-		"warrior_na92602", 
-		"fellaforlife", 
-		"BorgFellaQueen",
-		"WillowMantis",
-		"Jpod_art",
-		"not_honeybee", 
-		"elisabethinwa", 
-		"the_harald22976"
+		"NAFOwaldviertel",
+		"mitchbeatty5"
 	]
 
 
@@ -714,9 +775,13 @@ def block_patterns():
 	]
 
 
-
+# Do NOT use this list to find vatniks.  Some are fellas who have requested not to be promoted.
 def block_list():
 	return [	
+		"waldviertel4Eva",
+		"YuliaUaUltra",
+		"NastishkaA32359",
+		"squeaky1149",
 		"AlphariusFella",
 		"LuborKonicek",
 		"darthrevan1609",
