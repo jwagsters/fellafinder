@@ -104,10 +104,11 @@ def session():
 		if i%2 == 0:
 			visit_fella(check_list.pop(0))
 		else:
-			scrape_fella(scrape_list.pop(0))
+			pass
+			#scrape_fella(scrape_list.pop(0))
 
 		saveFellas()
-		sleep_rand(60)
+		sleep_rand(120)
 
 
 
@@ -123,7 +124,7 @@ def scrape_fella(fella):
 
 	body_text = driver_get("https://x.com/" + fella)
 
-	if "These posts are protected" in body_text or "Account suspended" in body_text or "This account doesn’t exist" in body_text:
+	if "These posts are protected" in body_text or "Account suspended" in body_text or "You’re blocked" in body_text or "This account doesn’t exist" in body_text:
 		fella_dict[fella]['ignore'] = True 
 		print("Account unavailable. Added to ignore list.")
 		return
@@ -228,7 +229,6 @@ def scrape_fella(fella):
 			except Exception as e:
 				exception_count += 1
 				print("-", end="")
-				print(e)
 				time.sleep(10)
 			done_list.append(user)
 
@@ -246,7 +246,7 @@ def visit_fella(fella):
 
 	tweets = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']")
 
-	if "These posts are protected" in body_text or "Account suspended" in body_text or "This account doesn’t exist" in body_text or len(tweets) == 0:
+	if "These posts are protected" in body_text or "Account suspended" in body_text or "You’re blocked" in body_text or "This account doesn’t exist" in body_text:
 		fella_dict[fella]['ignore'] = True 
 		print("Account unavailable. Added to ignore list.")
 		return
@@ -298,7 +298,7 @@ def update_fella(fella, follower_count, following_count, log = False):
 		if follower_count >= 500:
 			exclamations = ["WHOOP!!!", "HUZZAH!!!", "HOORAY!!!", "YAY!!!", "YIPPEE!!", "WORD UP!"]
 			message =  random.choice(exclamations) + " @" + fella['username'] + " now has " + str(follower_count) + " followers and is no longer a smol fella! "
-			message += "Thanks fellas for your support and please look after them. \n\n@" + fella['username'] + " please remember to check your followers list and follow everyone back."
+			message += "Thanks fellas for your support and please look after them. \n\n@" + fella['username'] + " please remember to check your followers list and follow everyone back. (Slowly, so you don't get locked.)"
 			post_message(message)
 		else:
 			try:
@@ -344,17 +344,18 @@ def boost_fella(fella):
 		pass
 
 	tweets = driver.find_elements(By.CSS_SELECTOR, "article[data-testid='tweet']")
-	tweet = random.choice(tweets)
-	try:
-		rt_btn = tweet.find_element(By.CSS_SELECTOR, "div[data-testid='retweet']")
-	except:
-		rt_btn = None
-	try:
-		like_btn = tweet.find_element(By.CSS_SELECTOR, "div[data-testid='like']")
-	except:
-		like_btn = None
+	if len(tweets):
+		tweet = random.choice(tweets)
+		try:
+			rt_btn = tweet.find_element(By.CSS_SELECTOR, "div[data-testid='retweet']")
+		except:
+			rt_btn = None
+		try:
+			like_btn = tweet.find_element(By.CSS_SELECTOR, "div[data-testid='like']")
+		except:
+			like_btn = None
 
-	driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", tweet)
+		driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'})", tweet)
 	
 	sleep_rand(1)
 
@@ -383,7 +384,7 @@ def boost_fella(fella):
 
 def post_message(content):
 	time.sleep(3)
-	get_link_containing("/compose/post").click()
+	button_click("a[data-testid='SideNav_NewTweet_Button']")
 	time.sleep(2)
 	input_field = driver.find_element(By.CSS_SELECTOR, "div[aria-modal='true'] [data-text='true']")
 	input_field.send_keys(Keys.CONTROL + "a")
@@ -447,11 +448,11 @@ def output_string():
 		if f['last_active'] != None and (now - f['last_active']).days < 14 and not f['ignore'] and f['follower_count'] < smol_limit:
 			tweet_list.append(fella)
 
-	str1 = ["Check out these lil fellas", "More smol fellas here", "Here are some little fellas", "These are smol fellas", "Here's some lesser-known fellas"]
+	str1 = ["More excellent fellas", "More smol fellas here", "Here are some little fellas", "These are smol fellas", "Here's some lesser-known fellas"]
 	s1 = random.choice(str1)
 	str2 = [" with not many followers of their own. ", " who need a bit of NAFO love. ", " who need your follows. ", " for you to help. ", " so you can follow and boost. ", " who need your support. "]
 	s2 = random.choice(str2)
-	str3 = ["Go give them a hand!", "Following is the way.", "See a smol fella, follow a smol fella!", "You know the drill."]
+	str3 = ["Go give them a hand!", "Following is the way.", "See a smol fella, follow a smol fella!", "You know the drill.", "#NAFOExpansionIsNonNegotiable."]
 	s3 = random.choice(str3)
 	ostr = s1 + s2 + s3 + "\n\n"
 
@@ -593,13 +594,15 @@ def driver_get(url):
 
 	global session_count, driver, USER_NAME, PASSWORD
 
+	print("Getting: " + url)
+
 	if datetime.datetime.now().hour < 6:
 		post_message(sign_off())
 		print("It's time for bed.")
-		prune_following()
 		time.sleep(60*60*7)
-		follow_back()
 		session_count = 0
+		prune_following()
+		follow_back()
 
 	try:
 		driver.get(url)
@@ -641,6 +644,8 @@ def driver_get(url):
 		sleep_rand(5)
 	except:
 		pass
+
+	print("Got: " + url)
 
 	return body_text
 
@@ -759,6 +764,11 @@ def get_button_by_text(text):
 		if text == el.text:
 			return el
 
+def button_click(selector):
+	button = driver.find_element(By.CSS_SELECTOR, selector)
+	driver.execute_script("arguments[0].click()", button)
+
+
 
 def add_list():
 	return[
@@ -771,13 +781,21 @@ def add_list():
 def block_patterns():
 	return [
 		"TimDobson",
-		"IncelFella"
+		"IncelFella",
+		"Olena",
+		"Schizo"
 	]
 
 
 # Do NOT use this list to find vatniks.  Some are fellas who have requested not to be promoted.
 def block_list():
-	return [	
+	return [
+		"BestActualFella",
+		"FellasBot1",
+		"RGheitica",	
+		"Rikhard_6790",
+		"FellaBackUp",
+		"olena_ivanenko",
 		"waldviertel4Eva",
 		"YuliaUaUltra",
 		"NastishkaA32359",
